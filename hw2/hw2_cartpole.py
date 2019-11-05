@@ -48,7 +48,7 @@ class Policy(nn.Module):
         self.reward_history = []
         self.loss_history = []
 
-    def forward(self, x):    
+    def forward(self, x):
         model = torch.nn.Sequential(
             self.l1,
             nn.Dropout(p=self.dropout),
@@ -60,13 +60,13 @@ class Policy(nn.Module):
 
 def select_action(state):
     #Select an action (0 or 1) by running policy model and choosing based on the probabilities in state
-    state = torch.from_numpy(state).type(torch.FloatTensor)
+    state = torch.from_numpy(state).type(torch.FloatTensor).cuda()
     state = policy(Variable(state))
     c = Categorical(state)
     action = c.sample()
 
     
-    # Add log probability of our chosen action to our history    
+    # Add log probability of our chosen action to our history
     if policy.policy_history.nelement() != 0:
         #print(policy.policy_history)
         #print(c.log_prob(action))
@@ -75,8 +75,8 @@ def select_action(state):
         policy.policy_history = (c.log_prob(action))
     return action
 
-policy = Policy(hidden_size=32,dropout=0.4)
-optimizer = optim.Adam(policy.parameters(), lr=0.03)
+policy = Policy(hidden_size=128,dropout=0.5).cuda()
+optimizer = optim.Adam(policy.parameters(), lr=0.01)
 
 for episode in range(EPISODE):
     state = env.reset() # Reset environment and record the starting state
@@ -86,7 +86,7 @@ for episode in range(EPISODE):
         action = select_action(state)
         # Step through environment using chosen action
         #print(action.data)
-        state, reward, done, _ = env.step( action.data.numpy())
+        state, reward, done, _ = env.step( action.cpu().data.numpy())
 
         # Save reward
         policy.reward_episode.append(reward)
@@ -103,7 +103,7 @@ for episode in range(EPISODE):
         rewards.insert(0,R)
         
     # Scale rewards
-    rewards = torch.FloatTensor(rewards)
+    rewards = torch.FloatTensor(rewards).cuda()
     rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
     
     # Calculate loss
@@ -120,14 +120,8 @@ for episode in range(EPISODE):
     policy.policy_history = Variable(torch.Tensor())
     policy.reward_episode= []
 
-    if episode % 50 == 0:
+    if episode % 10 == 0:
         print('Episode {}\tLast length: {:5d}'.format(episode, time))
-    
-    '''
-    if time > 200:
-        print("Solved! The last episode runs to {} time steps!".format(time))
-        break
-    '''
 
 
 
